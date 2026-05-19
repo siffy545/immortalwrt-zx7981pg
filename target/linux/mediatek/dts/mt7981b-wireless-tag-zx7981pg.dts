@@ -1,0 +1,336 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+/*
+ * ZX7981PG (MediaTek MT7981B / Filogic 820)
+ * Ported to ImmortalWrt kernel 6.6 from wireless-tag/zx-mtk-openwrt
+ * Optimized for Quectel RM521F-GL (Snapdragon X65) in M.2 USB3 slot
+ */
+
+/dts-v1/;
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+#include "mt7981.dtsi"
+
+/ {
+	model = "ZX7981PG";
+	compatible = "wireless-tag,zx7981pg", "mediatek,mt7981";
+
+	aliases {
+		serial0 = &uart0;
+		label-mac-device = &gmac0;
+		led-boot = &led_blue;
+		led-failsafe = &led_red;
+		led-running = &led_blue;
+		led-upgrade = &led_blue;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	memory@40000000 {
+		device_type = "memory";
+		reg = <0 0x40000000 0 0x10000000>;
+	};
+
+	/* Modem power control GPIOs for M.2 slot (RM521F-GL USB3 path) */
+	gpio-export {
+		compatible = "gpio-export";
+
+		modem-power {
+			gpio-export,name = "5gpower";
+			gpio-export,output = <0>;
+			gpios = <&pio 25 GPIO_ACTIVE_HIGH>;
+		};
+
+		modem-pwrkey {
+			gpio-export,name = "5gpwrkey";
+			gpio-export,output = <0>;
+			gpios = <&pio 2 GPIO_ACTIVE_HIGH>;
+		};
+
+		modem-sim {
+			gpio-export,name = "5gsim";
+			gpio-export,output = <1>;
+			gpios = <&pio 15 GPIO_ACTIVE_HIGH>;
+		};
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		reset {
+			label = "reset";
+			linux,code = <KEY_RESTART>;
+			gpios = <&pio 1 GPIO_ACTIVE_LOW>;
+		};
+
+		wps {
+			label = "wps";
+			linux,code = <KEY_WPS_BUTTON>;
+			gpios = <&pio 0 GPIO_ACTIVE_LOW>;
+		};
+
+		rfkill {
+			label = "rfkill";
+			linux,code = <KEY_RFKILL>;
+			gpios = <&pio 7 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		led-5g-blue {
+			label = "blue:5g";
+			gpios = <&pio 12 GPIO_ACTIVE_HIGH>;
+		};
+
+		led-5g-yellow {
+			label = "yellow:5g";
+			gpios = <&pio 11 GPIO_ACTIVE_HIGH>;
+		};
+
+		led-wifi {
+			label = "blue:wifi";
+			gpios = <&pio 9 GPIO_ACTIVE_HIGH>;
+		};
+
+		led_blue: led-blue {
+			label = "blue:status";
+			gpios = <&pio 5 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "heartbeat";
+		};
+
+		led_red: led-red {
+			label = "red:status";
+			gpios = <&pio 6 GPIO_ACTIVE_HIGH>;
+		};
+
+		led-4g-blue {
+			label = "blue:4g";
+			gpios = <&pio 10 GPIO_ACTIVE_HIGH>;
+		};
+
+		led-4g-yellow {
+			label = "yellow:4g";
+			gpios = <&pio 13 GPIO_ACTIVE_HIGH>;
+		};
+
+		led-lan2 {
+			label = "green:lan2";
+			gpios = <&pio 4 GPIO_ACTIVE_LOW>;
+		};
+
+		led-lan3 {
+			label = "green:lan3";
+			gpios = <&pio 22 GPIO_ACTIVE_LOW>;
+		};
+
+		led-wan {
+			label = "green:wan";
+			gpios = <&pio 8 GPIO_ACTIVE_LOW>;
+		};
+	};
+};
+
+&eth {
+	status = "okay";
+
+	gmac0: mac@0 {
+		compatible = "mediatek,eth-mac";
+		reg = <0>;
+		phy-mode = "2500base-x";
+		nvmem-cells = <&macaddr_factory_2a 0>;
+		nvmem-cell-names = "mac-address";
+
+		fixed-link {
+			speed = <2500>;
+			full-duplex;
+			pause;
+		};
+	};
+};
+
+&mdio_bus {
+	switch: switch@1f {
+		compatible = "mediatek,mt7531";
+		reg = <31>;
+		reset-gpios = <&pio 39 GPIO_ACTIVE_HIGH>;
+		interrupt-controller;
+		#interrupt-cells = <1>;
+		interrupt-parent = <&pio>;
+		interrupts = <38 IRQ_TYPE_LEVEL_HIGH>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@1 {
+				reg = <1>;
+				label = "lan2";
+			};
+
+			port@2 {
+				reg = <2>;
+				label = "lan3";
+			};
+
+			port@3 {
+				reg = <3>;
+				label = "wan";
+			};
+
+			port@6 {
+				reg = <6>;
+				label = "cpu";
+				ethernet = <&gmac0>;
+				phy-mode = "2500base-x";
+
+				fixed-link {
+					speed = <2500>;
+					full-duplex;
+					pause;
+				};
+			};
+		};
+	};
+};
+
+&pio {
+	spi0_flash_pins: spi0-pins {
+		mux {
+			function = "spi";
+			groups = "spi0", "spi0_wp_hold";
+		};
+
+		conf-pu {
+			pins = "SPI0_CS", "SPI0_HOLD", "SPI0_WP";
+			drive-strength = <8>;
+			mediatek,pull-up-adv = <0>;
+		};
+
+		conf-pd {
+			pins = "SPI0_CLK", "SPI0_MOSI", "SPI0_MISO";
+			drive-strength = <8>;
+			mediatek,pull-up-adv = <0>;
+		};
+	};
+
+	pcie_pins: pcie-pins {
+		mux {
+			function = "pcie";
+			groups = "pcie_pereset", "pcie_clk", "pcie_wake";
+		};
+	};
+};
+
+&spi0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi0_flash_pins>;
+	status = "okay";
+
+	spi_nand: flash@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "spi-nand";
+		reg = <0>;
+
+		spi-max-frequency = <52000000>;
+		spi-tx-bus-width = <4>;
+		spi-rx-bus-width = <4>;
+
+		mediatek,nmbm;
+		mediatek,bmt-max-ratio = <1>;
+		mediatek,bmt-max-reserved-blocks = <64>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "BL2";
+				reg = <0x0 0x100000>;
+				read-only;
+			};
+
+			partition@100000 {
+				label = "u-boot-env";
+				reg = <0x100000 0x80000>;
+			};
+
+			factory: partition@180000 {
+				label = "Factory";
+				reg = <0x180000 0x200000>;
+				read-only;
+
+				nvmem-layout {
+					compatible = "fixed-layout";
+					#address-cells = <1>;
+					#size-cells = <1>;
+
+					eeprom_factory_0: eeprom@0 {
+						reg = <0x0 0x1000>;
+					};
+
+					macaddr_factory_2a: macaddr@2a {
+						compatible = "mac-base";
+						reg = <0x2a 0x6>;
+						#nvmem-cell-cells = <1>;
+					};
+				};
+			};
+
+			partition@380000 {
+				label = "FIP";
+				reg = <0x380000 0x200000>;
+				read-only;
+			};
+
+			partition@580000 {
+				label = "woem";
+				reg = <0x580000 0xa0000>;
+				read-only;
+			};
+
+			partition@620000 {
+				label = "ubi";
+				reg = <0x620000 0x3800000>;
+			};
+		};
+	};
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&watchdog {
+	status = "okay";
+};
+
+&wifi {
+	nvmem-cells = <&eeprom_factory_0>;
+	nvmem-cell-names = "eeprom";
+	status = "okay";
+};
+
+&usb_phy {
+	status = "okay";
+};
+
+/* USB3 enabled for RM521F-GL modem in M.2 slot */
+&xhci {
+	mediatek,u3p-dis-msk = <0x0>;
+	phys = <&u2port0 PHY_TYPE_USB2>,
+	       <&u3port0 PHY_TYPE_USB3>;
+	status = "okay";
+};
+
+/* PCIe disabled - reserved for future modem upgrade path */
+&pcie {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pcie_pins>;
+	status = "disabled";
+};
