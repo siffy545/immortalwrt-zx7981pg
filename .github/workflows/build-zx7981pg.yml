@@ -61,9 +61,11 @@ jobs:
 
       - name: Build firmware
         run: |
+          set -o pipefail
           echo "Building ImmortalWrt kernel 6.6 for ZX7981PG + RM521F-GL (X65)"
-          make -j$(nproc) || make -j1 V=s 2>&1 | tee /tmp/build.log
-          echo "Build finished"
+          make -j$(nproc) 2>&1 | tee /tmp/build.log || \
+            make -j1 V=s 2>&1 | tee /tmp/build-verbose.log
+          echo "=== Output images ==="
           find bin/targets/ -name "*.bin" -o -name "*.itb" 2>/dev/null | head -20
 
       - name: Upload sysupgrade image
@@ -87,10 +89,10 @@ jobs:
           path: bin/targets/mediatek/
           if-no-files-found: warn
 
-      - name: Upload build log on failure
+      - name: Upload build logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-log
-          path: /tmp/build.log
+          name: build-logs
+          path: /tmp/build*.log
           if-no-files-found: ignore
