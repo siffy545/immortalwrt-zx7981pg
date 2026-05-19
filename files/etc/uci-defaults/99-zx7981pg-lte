@@ -1,0 +1,35 @@
+#!/bin/sh
+# ZX7981PG first-boot modem network setup
+# RM521F-GL in ECM mode (usb0) — switch to MBIM via AT+QCFG="usbnet",5 for higher throughput
+
+# LTE data interface (ECM mode default, modem provides DHCP via usb0)
+uci -q batch <<-UCI
+	set network.lte=interface
+	set network.lte.proto=dhcp
+	set network.lte.device=usb0
+	set network.lte.metric=10
+	set network.lte6=interface
+	set network.lte6.proto=dhcpv6
+	set network.lte6.device=usb0
+	commit network
+UCI
+
+# Add LTE to WAN firewall zone
+uci -q batch <<-UCI
+	add_list firewall.@zone[1].network=lte
+	add_list firewall.@zone[1].network=lte6
+	commit firewall
+UCI
+
+# TTL=65 masquerade for T-Mobile (prevents tethering detection)
+cat > /etc/nftables.d/10-ttl-masquerade.nft <<-'NFTEOF'
+	table inet ttl_fix {
+		chain postrouting {
+			type filter hook postrouting priority mangle;
+			oifname "usb0" ip ttl set 65
+			oifname "usb0" ip6 hoplimit set 65
+		}
+	}
+NFTEOF
+
+exit 0
