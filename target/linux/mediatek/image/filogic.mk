@@ -2694,3 +2694,29 @@ ifneq ($(CONFIG_TARGET_ROOTFS_INITRAMFS),)
 endif
 endef
 TARGET_DEVICES += wirelesstag_zx7981pd-ubootmod
+
+### ZX7981PG — MediaTek MT7981B + Quectel RM521F-GL (X65) via USB3 M.2 slot
+define Device/wireless-tag_zx7981pg
+  DEVICE_VENDOR := Wireless-Tag
+  DEVICE_MODEL := ZX7981PG
+  DEVICE_DTS := mt7981b-wireless-tag-zx7981pg
+  DEVICE_DTS_DIR := ../dts
+  SUPPORTED_DEVICES += ZX7981PG wireless-tag,zx7981pg
+  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware \
+    kmod-usb3 kmod-usb-net-cdc-ether kmod-usb-net-cdc-mbim \
+    kmod-usb-net-cdc-ncm kmod-usb-net-qmi-wwan \
+    kmod-usb-serial-option umbim uqmi
+  UBINIZE_OPTS := -E 5
+  BLOCKSIZE := 128k
+  PAGESIZE := 2048
+  IMAGE_SIZE := 57344k
+  KERNEL_IN_UBI := 1
+  IMAGES += factory.bin
+  IMAGE/factory.bin := append-ubi | check-size $$$$(IMAGE_SIZE)
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+  KERNEL = kernel-bin | lzma | \
+	fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
+  KERNEL_INITRAMFS = kernel-bin | lzma | \
+	fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd
+endef
+TARGET_DEVICES += wireless-tag_zx7981pg
