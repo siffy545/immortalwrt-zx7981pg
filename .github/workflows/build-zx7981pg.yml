@@ -7,12 +7,22 @@ on:
     paths:
       - 'target/linux/mediatek/dts/mt7981b-wireless-tag-zx7981pg.dts'
       - 'target/linux/mediatek/image/filogic.mk'
-      - 'defconfig/mt7981-zx7981pg.config'
+      - 'defconfig/mt7981-zx7981pg-cli.config'
+      - 'defconfig/mt7981-zx7981pg-ui.config'
+      - 'files/etc/uci-defaults/**'
 
 jobs:
   build:
     runs-on: ubuntu-22.04
     timeout-minutes: 240
+    strategy:
+      matrix:
+        include:
+          - variant: cli
+            name: CLI
+          - variant: ui
+            name: UI
+      fail-fast: false
 
     steps:
       - name: Free disk space
@@ -49,9 +59,9 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Configure build for ZX7981PG
+      - name: Configure build (${{ matrix.name }})
         run: |
-          cp defconfig/mt7981-zx7981pg.config .config
+          cp defconfig/mt7981-zx7981pg-${{ matrix.variant }}.config .config
           make defconfig
 
       - name: Download packages
@@ -59,33 +69,33 @@ jobs:
           make download -j$(nproc)
           find dl -size -1024c -exec rm -f {} \;
 
-      - name: Build firmware
+      - name: Build firmware (${{ matrix.name }})
         run: |
           set -o pipefail
-          echo "Building ImmortalWrt kernel 6.6 for ZX7981PG + RM521F-GL (X65)"
+          echo "Building ZX7981PG ImmortalWrt 6.6 — ${{ matrix.name }} variant"
           make -j$(nproc) 2>&1 | tee /tmp/build.log || \
             make -j1 V=s 2>&1 | tee /tmp/build-verbose.log
           echo "=== Output images ==="
-          find bin/targets/ -name "*.bin" -o -name "*.itb" 2>/dev/null | head -20
+          find bin/targets/ -name "*.bin" 2>/dev/null | head -20
 
-      - name: Upload sysupgrade image
+      - name: Upload sysupgrade image (${{ matrix.name }})
         uses: actions/upload-artifact@v4
         with:
-          name: ZX7981PG-ImmortalWrt-6.6-sysupgrade
+          name: ZX7981PG-${{ matrix.name }}-sysupgrade
           path: bin/targets/mediatek/**/*zx7981pg*sysupgrade*
           if-no-files-found: warn
 
-      - name: Upload factory image
+      - name: Upload factory image (${{ matrix.name }})
         uses: actions/upload-artifact@v4
         with:
-          name: ZX7981PG-ImmortalWrt-6.6-factory
+          name: ZX7981PG-${{ matrix.name }}-factory
           path: bin/targets/mediatek/**/*zx7981pg*factory*
           if-no-files-found: warn
 
-      - name: Upload full targets directory
+      - name: Upload full targets (${{ matrix.name }})
         uses: actions/upload-artifact@v4
         with:
-          name: ZX7981PG-ImmortalWrt-6.6-all
+          name: ZX7981PG-${{ matrix.name }}-all
           path: bin/targets/mediatek/
           if-no-files-found: warn
 
@@ -93,6 +103,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-logs
+          name: build-logs-${{ matrix.variant }}
           path: /tmp/build*.log
           if-no-files-found: ignore
